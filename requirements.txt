@@ -9,4 +9,4 @@ pypdf
 reportlab
 httpx
 psycopg2-binary
-vercel-blob
+vercel

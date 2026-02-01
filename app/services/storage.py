@@ -8,7 +8,7 @@ BLOB_READ_WRITE_TOKEN = os.getenv("BLOB_READ_WRITE_TOKEN")
 IS_VERCEL = BLOB_READ_WRITE_TOKEN is not None
 
 if IS_VERCEL:
-    from vercel_blob import put, get, delete as blob_delete
+    from vercel.blob import put, get, delete as blob_delete
 
 # Local storage directories
 LOCAL_UPLOAD_DIR = "uploads"
