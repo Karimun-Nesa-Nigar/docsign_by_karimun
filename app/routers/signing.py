@@ -1,38 +1,45 @@
 import os
-import json
+import io
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
-from fastapi.responses import FileResponse
 from .. import models, schemas
 from ..database import get_db
-from ..services import pdf_service
+from ..services import pdf_service, storage
 
 router = APIRouter()
 
-SIGNED_DOCS_DIR = "signed_docs"
-os.makedirs(SIGNED_DOCS_DIR, exist_ok=True)
-
 @router.get("/download/{token}")
-def download_signed_by_token(token: str, db: Session = Depends(get_db)):
+async def download_signed_by_token(token: str, db: Session = Depends(get_db)):
     signer = db.query(models.Signer).filter(models.Signer.token == token).first()
     if not signer:
         raise HTTPException(status_code=404, detail="Invalid token")
     
     document = signer.document
-    if document.status != models.DocumentStatus.COMPLETED:
-        # If not fully signed, let them download original for now? 
-        # Or just say "Processing"? 
-        # Usually they want the final signed version.
-        # Let's return original if not finished, or signed if done.
-        return FileResponse(document.file_path, filename=document.filename, media_type="application/pdf")
-
-    signed_path = os.path.join(SIGNED_DOCS_DIR, f"signed_{document.id}.pdf")
-    if os.path.exists(signed_path):
-         return FileResponse(signed_path, filename=f"signed_{document.filename}", media_type="application/pdf")
+    file_path = document.file_path
+    filename = document.filename
     
-    return FileResponse(document.file_path, filename=document.filename, media_type="application/pdf")
+    if document.status == models.DocumentStatus.COMPLETED:
+        # Try to get signed version
+        signed_filename = f"signed_{document.id}.pdf"
+        if storage.IS_VERCEL:
+            signed_path = document.file_path.replace(os.path.basename(document.file_path), signed_filename) if "/" in document.file_path else f"signed_docs/{signed_filename}"
+        else:
+            signed_path = os.path.join("signed_docs", signed_filename)
+            if os.path.exists(signed_path):
+                file_path = signed_path
+                filename = f"signed_{filename}"
+    
+    # Download file content
+    file_content = await storage.download_file(file_path)
+    
+    return Response(
+        content=file_content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 class SignatureSubmission(BaseModel):
     signature_data: str # Base64 image string
@@ -54,7 +61,7 @@ def view_document_for_signing(token: str, db: Session = Depends(get_db)):
     }
 
 @router.post("/sign/{token}")
-def sign_document(token: str, submission: SignatureSubmission, request: Request, db: Session = Depends(get_db)):
+async def sign_document(token: str, submission: SignatureSubmission, request: Request, db: Session = Depends(get_db)):
     signer = db.query(models.Signer).filter(models.Signer.token == token).first()
     if not signer:
         raise HTTPException(status_code=404, detail="Invalid signing link")
@@ -71,13 +78,13 @@ def sign_document(token: str, submission: SignatureSubmission, request: Request,
     # OR better yet, we just burn it immediately if all complete. 
     # BUT, if others haven't signed, we lose this guy's signature if we don't save it.
     
-    # Let's save the signature image to disk for the signer
-    sig_filename = f"sig_{signer.id}_{signer.token}.png"
-    sig_path = os.path.join(SIGNED_DOCS_DIR, sig_filename)
-    # Actually just write the full base64 string to a text file or just rely on burning at end?
-    # If we rely on burning at the end, we MUST save it now.
-    with open(sig_path + ".txt", "w") as f:
-         f.write(submission.signature_data)
+    # Save the signature image using storage layer
+    sig_filename = f"sig_{signer.id}_{signer.token}.png.txt"
+    sig_content = io.BytesIO(submission.signature_data.encode('utf-8'))
+    sig_path = await storage.upload_file(sig_content, sig_filename, "signed_docs")
+    
+    # Store the signature path in the signer for later retrieval
+    # For now, we'll reconstruct it when needed
     
     # Log audit
     audit = models.AuditLog(
@@ -105,12 +112,17 @@ def sign_document(token: str, submission: SignatureSubmission, request: Request,
         
         signatures_to_burn = []
         for s in document.signers:
-            # Load saved signature
-            s_sig_path = os.path.join(SIGNED_DOCS_DIR, f"sig_{s.id}_{s.token}.png.txt")
-            if os.path.exists(s_sig_path):
-                with open(s_sig_path, "r") as f:
-                    sig_data = f.read()
+            # Load saved signature using storage layer
+            s_sig_filename = f"sig_{s.id}_{s.token}.png.txt"
+            if storage.IS_VERCEL:
+                s_sig_path = f"signed_docs/{s_sig_filename}"
             else:
+                s_sig_path = os.path.join("signed_docs", s_sig_filename)
+            
+            try:
+                sig_content_bytes = await storage.download_file(s_sig_path)
+                sig_data = sig_content_bytes.decode('utf-8')
+            except:
                 sig_data = None
 
             user_fields = [f for f in document.fields if f.signer_id == s.id]
@@ -127,7 +139,17 @@ def sign_document(token: str, submission: SignatureSubmission, request: Request,
                 })
         
         try:
-            pdf_service.sign_pdf(file_path, output_path, signatures_to_burn)
+            # Download original PDF
+            original_pdf_bytes = await storage.download_file(file_path)
+            
+            # Generate signed PDF in memory
+            output_pdf_bytes = pdf_service.sign_pdf_bytes(original_pdf_bytes, signatures_to_burn)
+            
+            # Upload signed PDF
+            signed_filename = f"signed_{document.id}.pdf"
+            output_pdf_io = io.BytesIO(output_pdf_bytes)
+            signed_path = await storage.upload_file(output_pdf_io, signed_filename, "signed_docs")
+            
             audit_complete = models.AuditLog(
                 document_id=document.id,
                 action="COMPLETED",

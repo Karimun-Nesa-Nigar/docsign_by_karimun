@@ -4,7 +4,9 @@ sqlalchemy
 pydantic
 python-multipart
 python-jose[cryptography]
-passlib[bcrypt]
+passlib[argon2]
 pypdf
 reportlab
 httpx
+psycopg2-binary
+vercel-blob

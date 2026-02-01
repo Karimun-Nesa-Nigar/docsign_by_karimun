@@ -1,40 +1,34 @@
-import shutil
 import uuid
 import os
+import io
 from datetime import datetime
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
-from fastapi.responses import FileResponse
+from fastapi.responses import Response
 from sqlalchemy.orm import Session
 from .. import models, schemas
 from ..database import get_db
 from .users import get_current_user
+from ..services import storage
 
 router = APIRouter()
 
-UPLOAD_DIR = "uploads"
-SIGNED_DOCS_DIR = "signed_docs"
-# Ensure dirs exist
-os.makedirs(UPLOAD_DIR, exist_ok=True)
-os.makedirs(SIGNED_DOCS_DIR, exist_ok=True)
-
 @router.post("/upload", response_model=schemas.Document)
-def upload_document(
+async def upload_document(
     file: UploadFile = File(...),
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
 ):
-    # Determine file location
-    file_location = os.path.join(UPLOAD_DIR, f"{uuid.uuid4()}_{file.filename}")
+    # Generate unique filename
+    unique_filename = f"{uuid.uuid4()}_{file.filename}"
     
-    # Save file
-    with open(file_location, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
+    # Upload file using storage layer
+    file_path = await storage.upload_file(file.file, unique_filename, "uploads")
     
     # Create DB entry
     db_document = models.Document(
         user_id=current_user.id,
         filename=file.filename,
-        file_path=file_location,
+        file_path=file_path,
         status=models.DocumentStatus.DRAFT
     )
     db.add(db_document)
@@ -50,7 +44,7 @@ def list_documents(
     return db.query(models.Document).filter(models.Document.user_id == current_user.id).all()
 
 @router.get("/{document_id}/download")
-def download_document(
+async def download_document(
     document_id: int,
     current_user: models.User = Depends(get_current_user),
     db: Session = Depends(get_db)
@@ -59,15 +53,31 @@ def download_document(
     if not document:
         raise HTTPException(status_code=404, detail="Document not found")
     
-    if document.status == models.DocumentStatus.COMPLETED:
-        # Check for signed file
-        signed_path = os.path.join(SIGNED_DOCS_DIR, f"signed_{document.id}.pdf")
-        if os.path.exists(signed_path):
-            return FileResponse(signed_path, filename=f"signed_{document.filename}", media_type="application/pdf")
-        # Fallback if processing failed? Or maybe it's still processing.
+    # Determine which file to serve
+    file_path = document.file_path
+    filename = document.filename
     
-    # Return original if not completed (or fallback)
-    return FileResponse(document.file_path, filename=document.filename, media_type="application/pdf")
+    if document.status == models.DocumentStatus.COMPLETED:
+        # Try to get signed version
+        signed_filename = f"signed_{document.id}.pdf"
+        if storage.IS_VERCEL:
+            # In Vercel, check if signed file exists in DB or construct blob URL
+            # For now, we'll store signed_path in a separate field or use naming convention
+            signed_path = document.file_path.replace(document.filename, signed_filename) if "/" in document.file_path else f"signed_docs/{signed_filename}"
+        else:
+            signed_path = os.path.join("signed_docs", signed_filename)
+            if os.path.exists(signed_path):
+                file_path = signed_path
+                filename = f"signed_{filename}"
+    
+    # Download file content
+    file_content = await storage.download_file(file_path)
+    
+    return Response(
+        content=file_content,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"}
+    )
 
 @router.post("/{document_id}/signers", response_model=schemas.Signer)
 def add_signer(
