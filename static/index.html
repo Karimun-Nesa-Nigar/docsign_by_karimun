@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Docsign by Karimun</title>
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --card-bg: #1e293b;
+            --text-primary: #f8fafc;
+            --text-secondary: #94a3b8;
+            --accent: #3b82f6;
+            --accent-hover: #2563eb;
+            --danger: #ef4444;
+            --success: #22c55e;
+            --border: #334155;
+        }
+
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            margin: 0;
+            padding: 0;
+            min-height: 100vh;
+        }
+
+        .container {
+            max-width: 900px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 0.75rem;
+            padding: 2rem;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+            border: 1px solid var(--border);
+            margin-bottom: 2rem;
+        }
+
+        h1,
+        h2,
+        h3 {
+            margin-top: 0;
+        }
+
+        .text-secondary {
+            color: var(--text-secondary);
+        }
+
+        input,
+        select,
+        button {
+            display: block;
+            width: 100%;
+            padding: 0.75rem;
+            margin-bottom: 1rem;
+            border-radius: 0.5rem;
+            border: 1px solid var(--border);
+            background-color: var(--bg-color);
+            color: var(--text-primary);
+            font-size: 1rem;
+            box-sizing: border-box;
+        }
+
+        button {
+            background-color: var(--accent);
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover {
+            background-color: var(--accent-hover);
+        }
+
+        button.secondary {
+            background-color: transparent;
+            border: 1px solid var(--border);
+        }
+
+        button.secondary:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .flex {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 1rem;
+        }
+
+        .status-badge {
+            padding: 0.25rem 0.5rem;
+            border-radius: 1rem;
+            font-size: 0.75rem;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+
+        .status-DRAFT {
+            background-color: var(--text-secondary);
+            color: #000;
+        }
+
+        .status-SENT {
+            background-color: var(--accent);
+            color: white;
+        }
+
+        .status-COMPLETED {
+            background-color: var(--success);
+            color: white;
+        }
+
+        .signature-box {
+            border: 2px dashed var(--border);
+            padding: 2rem;
+            text-align: center;
+            margin-bottom: 1rem;
+        }
+
+        /* PDF Placement Overlay */
+        #pdf-render-container {
+            position: relative;
+            display: inline-block;
+            border: 1px solid var(--border);
+            max-width: 100%;
+            overflow: auto;
+            background: #1e293b;
+            padding: 2rem;
+            border-radius: 0.5rem;
+        }
+
+        #placement-canvas {
+            display: block;
+            margin: 0 auto;
+            box-shadow: 0 0 20px rgba(0, 0, 0, 0.4);
+            background: white;
+        }
+
+        #drag-signature-box {
+            position: absolute;
+            width: 150px;
+            height: 50px;
+            background: rgba(59, 130, 246, 0.4);
+            border: 2px solid var(--accent);
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: move;
+            font-size: 0.75rem;
+            user-select: none;
+            z-index: 10;
+            font-weight: bold;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+        }
+    </style>
+</head>
+
+<body>
+    <div id="app" class="container">
+        <!-- Notifications -->
+        <div id="notification"
+            style="position: fixed; top: 20px; right: 20px; padding: 1rem; background: var(--accent); border-radius: 0.5rem; display: none; z-index: 100;">
+        </div>
+
+        <!-- VIEW: AUTH -->
+        <div id="view-auth">
+            <div class="card" style="max-width: 400px; margin: 4rem auto;">
+                <h1 style="text-align: center;">Docsign</h1>
+                <p class="text-secondary" style="text-align: center; margin-bottom: 2rem;">Secure, simple e-signatures.
+                </p>
+                <div id="auth-login">
+                    <form onsubmit="handleLogin(event)">
+                        <input type="text" id="login-email" placeholder="Email" required>
+                        <input type="password" id="login-password" placeholder="Password" required>
+                        <button type="submit">Sign In</button>
+                    </form>
+                    <p class="text-secondary" style="font-size: 0.875rem; text-align: center; margin-top: 1rem;">
+                        New? <a href="#" onclick="toggleAuth('register')" style="color: var(--accent);">Create
+                            account</a>
+                    </p>
+                </div>
+                <div id="auth-register" class="hidden">
+                    <form onsubmit="handleRegister(event)">
+                        <input type="text" id="reg-email" placeholder="Email" required>
+                        <input type="password" id="reg-password" placeholder="Password" required>
+                        <button type="submit">Create Account</button>
+                    </form>
+                    <p class="text-secondary" style="font-size: 0.875rem; text-align: center; margin-top: 1rem;">
+                        Have an account? <a href="#" onclick="toggleAuth('login')" style="color: var(--accent);">Sign
+                            in</a>
+                    </p>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: DASHBOARD -->
+        <div id="view-dashboard" class="hidden">
+            <div class="flex" style="margin-bottom: 2rem;">
+                <h2>Documents</h2>
+                <div>
+                    <span id="user-email" class="text-secondary" style="margin-right: 1rem;"></span>
+                    <button class="secondary" onclick="logout()"
+                        style="width: auto; display: inline-block;">Logout</button>
+                </div>
+            </div>
+            <div class="card">
+                <h3>Upload New Document</h3>
+                <form onsubmit="handleUpload(event)" class="flex">
+                    <input type="file" id="doc-file" accept="application/pdf" required
+                        style="margin-bottom: 0; width: auto; flex-grow: 1; margin-right: 1rem;">
+                    <button type="submit" style="width: auto; margin-bottom: 0;">Upload PDF</button>
+                </form>
+            </div>
+            <div id="doc-list" class="grid"></div>
+        </div>
+
+        <!-- VIEW: DOCUMENT DETAIL -->
+        <div id="view-detail" class="hidden">
+            <button class="secondary" onclick="showView('view-dashboard')"
+                style="width: auto; margin-bottom: 1rem;">&larr; Back to Dashboard</button>
+            <div class="card">
+                <h2 id="detail-filename">Filename.pdf</h2>
+                <div class="flex" style="justify-content: flex-start; gap: 1rem;">
+                    <span id="detail-status" class="status-badge">DRAFT</span>
+                    <button id="download-btn" class="hidden"
+                        style="width: auto; padding: 0.25rem 0.5rem; font-size: 0.8rem; background: var(--success);">Download
+                        Signed PDF</button>
+                </div>
+                <div style="margin-top: 2rem;">
+                    <h3>1. Add Signer</h3>
+                    <form onsubmit="handleAddSigner(event)" class="flex">
+                        <input type="email" id="signer-email" placeholder="Signer Email" required
+                            style="margin-bottom: 0; margin-right: 1rem;">
+                        <input type="text" id="signer-name" placeholder="Signer Name" required
+                            style="margin-bottom: 0; margin-right: 1rem;">
+                        <button type="submit" style="width: auto; margin-bottom: 0;">Add</button>
+                    </form>
+                </div>
+                <div style="margin-top: 2rem;">
+                    <h3>2. Add Signature Field</h3>
+                    <p class="text-secondary">Select a signer and place their signature field on the document.</p>
+                    <div class="flex" style="gap: 1rem;">
+                        <select id="field-signer-select" required style="margin-bottom: 0;">
+                            <option value="">Select Signer...</option>
+                        </select>
+                        <button onclick="openVisualPlacement()" style="width: auto; margin-bottom: 0;">Place Field
+                            Visually</button>
+                    </div>
+                </div>
+                <div style="margin-top: 2rem; border-top: 1px solid var(--border); padding-top: 1rem;">
+                    <h3>3. Send Document</h3>
+                    <button onclick="handleSend()" style="width: auto;">Send for Signing</button>
+                </div>
+                <div id="signing-links-container" class="hidden"
+                    style="margin-top: 2rem; background: #000; padding: 1rem; border-radius: 0.5rem; font-family: monospace;">
+                    <h4>Mock Email Links (Copy link to sign):</h4>
+                    <div id="signing-links-list"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: VISUAL PLACEMENT -->
+        <div id="view-visual-placement" class="hidden">
+            <button class="secondary" onclick="showView('view-detail')" style="width: auto; margin-bottom: 1rem;">&larr;
+                Cancel</button>
+            <div class="card">
+                <h2>Place Signature Field</h2>
+                <p class="text-secondary">Drag the blue box to where you want the signature to appear.</p>
+                <div id="pdf-render-container">
+                    <canvas id="placement-canvas"></canvas>
+                    <div id="drag-signature-box" class="hidden">Signature</div>
+                </div>
+
+                <div id="placement-options"
+                    style="margin-top: 1.5rem; background: rgba(255,255,255,0.05); padding: 1.5rem; border-radius: 0.5rem; border: 1px solid var(--border);">
+                    <h3 style="margin-bottom: 1rem; font-size: 1rem;">Field Options</h3>
+                    <label
+                        style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; font-size: 0.95rem; margin-bottom: 0.75rem;">
+                        <input type="checkbox" id="field-include-name" checked
+                            style="width: auto; margin: 0; transform: scale(1.2);"> Include signer's name below
+                        signature
+                    </label>
+                    <label
+                        style="display: flex; align-items: center; gap: 0.75rem; cursor: pointer; font-size: 0.95rem; margin-bottom: 1rem;">
+                        <input type="checkbox" id="field-include-date" checked
+                            style="width: auto; margin: 0; transform: scale(1.2);"> Include the signing date
+                    </label>
+                    <button onclick="confirmVisualField()">Save Field & Position</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- VIEW: SIGNING -->
+        <div id="view-signing" class="hidden">
+            <div class="card" style="max-width: 600px; margin: 4rem auto;">
+                <h2 style="text-align: center;">Sign Document</h2>
+                <p id="signing-doc-name" style="text-align: center;" class="text-secondary">Contract.pdf</p>
+                <div class="signature-box" style="position: relative;">
+                    <p>I, <b id="signing-signer-name">User</b>, agree to sign this document.</p>
+                    <p class="text-secondary" style="font-size: 0.8rem; margin-bottom: 0.5rem;">Draw your signature
+                        below:</p>
+                    <canvas id="sig-canvas" width="500" height="200"
+                        style="border: 1px solid #ccc; background: white; cursor: crosshair; touch-action: none;"></canvas>
+                    <br>
+                    <button class="secondary" onclick="clearSignature()"
+                        style="width: auto; display: inline-block; margin-top: 0.5rem; font-size: 0.8rem; padding: 0.25rem 0.5rem;">Clear
+                        Canvas</button>
+                </div>
+                <button onclick="submitSignature()" style="margin-top: 1rem;">Submit Signature</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+    <script>
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        const API_URL = location.origin;
+        let token = localStorage.getItem('token');
+        let currentDocId = null, signingToken = null;
+        let canvas, ctx, drawing = false;
+        let pdfDoc = null, currentPageNum = 1, placementScale = 1.0, signatureBoxPos = { x: 50, y: 50 };
+
+        async function authFetch(url, options = {}) {
+            if (!options.headers) options.headers = {};
+            if (token) options.headers['Authorization'] = `Bearer ${token}`;
+            const res = await fetch(url, options);
+            if (res.status === 401) {
+                notify("Session expired. Please login again.");
+                logout();
+                throw new Error("Unauthorized");
+            }
+            return res;
+        }
+
+        function showView(viewId) {
+            document.querySelectorAll('#app > div').forEach(el => {
+                if (el.id !== 'notification') el.classList.add('hidden');
+            });
+            document.getElementById(viewId).classList.remove('hidden');
+            if (viewId === 'view-signing') initCanvas();
+        }
+
+        function notify(msg) {
+            const el = document.getElementById('notification');
+            el.textContent = msg; el.style.display = 'block';
+            setTimeout(() => el.style.display = 'none', 3000);
+        }
+
+        // --- AUTH ---
+        async function handleLogin(e) {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('username', document.getElementById('login-email').value);
+            formData.append('password', document.getElementById('login-password').value);
+            try {
+                const res = await fetch(`${API_URL}/token`, { method: 'POST', body: formData });
+                if (!res.ok) throw new Error('Login failed');
+                const data = await res.json();
+                token = data.access_token;
+                localStorage.setItem('token', token);
+                localStorage.setItem('email', document.getElementById('login-email').value);
+                loadDashboard();
+            } catch (err) { notify(err.message); }
+        }
+
+        async function handleRegister(e) {
+            e.preventDefault();
+            try {
+                const res = await fetch(`${API_URL}/register`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: document.getElementById('reg-email').value, password: document.getElementById('reg-password').value })
+                });
+                if (!res.ok) {
+                    const errorData = await res.json();
+                    throw new Error(errorData.detail || 'Registration failed');
+                }
+                notify('Registered! Please login.');
+                toggleAuth('login');
+            } catch (err) { notify(err.message); }
+        }
+
+        function logout() { localStorage.removeItem('token'); location.reload(); }
+        function toggleAuth(mode) {
+            document.getElementById('auth-login').classList.toggle('hidden', mode !== 'login');
+            document.getElementById('auth-register').classList.toggle('hidden', mode !== 'register');
+        }
+
+        // --- DASHBOARD ---
+        async function loadDashboard() {
+            document.getElementById('user-email').textContent = localStorage.getItem('email');
+            showView('view-dashboard');
+            try {
+                const res = await authFetch(`${API_URL}/documents/`);
+                const docs = await res.json();
+                const list = document.getElementById('doc-list');
+                list.innerHTML = '';
+                docs.forEach(doc => {
+                    const el = document.createElement('div');
+                    el.className = 'card'; el.style.marginBottom = '0';
+                    el.innerHTML = `
+                        <div class="flex"><h4 style="margin:0">${doc.filename}</h4><span class="status-badge status-${doc.status}">${doc.status}</span></div>
+                        <p class="text-secondary" style="font-size: 0.8rem">Created: ${new Date(doc.created_at).toLocaleDateString()}</p>
+                        <button onclick="loadDetail(${doc.id})" class="secondary" style="margin-top: 1rem;">Manage</button>`;
+                    list.appendChild(el);
+                });
+            } catch (err) { notify('Failed to load dashboard'); }
+        }
+
+        async function handleUpload(e) {
+            e.preventDefault();
+            const formData = new FormData();
+            formData.append('file', document.getElementById('doc-file').files[0]);
+            try {
+                const res = await authFetch(`${API_URL}/documents/upload`, {
+                    method: 'POST', body: formData
+                });
+                if (!res.ok) throw new Error('Upload failed');
+                document.getElementById('doc-file').value = '';
+                loadDashboard(); notify('Document uploaded');
+            } catch (err) { notify(err.message); }
+        }
+
+        // --- DETAIL ---
+        async function loadDetail(id) {
+            currentDocId = id;
+            try {
+                const res = await authFetch(`${API_URL}/documents/`);
+                const docs = await res.json();
+                const doc = docs.find(d => d.id === id);
+                document.getElementById('detail-filename').textContent = doc.filename;
+                document.getElementById('detail-status').textContent = doc.status;
+                document.getElementById('detail-status').className = `status-badge status-${doc.status}`;
+                const select = document.getElementById('field-signer-select');
+                select.innerHTML = '<option value="">Select Signer...</option>';
+                doc.signers.forEach(s => {
+                    const opt = document.createElement('option');
+                    opt.value = s.email; opt.textContent = s.name + (s.has_signed ? ' (Signed)' : '');
+                    select.appendChild(opt);
+                });
+                if (doc.status === 'COMPLETED') {
+                    document.getElementById('download-btn').classList.remove('hidden');
+                    document.getElementById('download-btn').onclick = async () => {
+                        try {
+                            const res = await authFetch(`${API_URL}/documents/${id}/download`);
+                            if (!res.ok) throw new Error('Download failed');
+                            const blob = await res.blob();
+                            const url = window.URL.createObjectURL(blob);
+                            const a = document.createElement('a');
+                            a.href = url;
+                            a.download = `signed_${doc.filename}`;
+                            document.body.appendChild(a);
+                            a.click();
+                            window.URL.revokeObjectURL(url);
+                        } catch (err) { notify(err.message); }
+                    };
+                } else { document.getElementById('download-btn').classList.add('hidden'); }
+                document.getElementById('signing-links-container').classList.add('hidden');
+                showView('view-detail');
+            } catch (err) { notify('Failed to load detail'); }
+        }
+
+        async function handleAddSigner(e) {
+            e.preventDefault();
+            try {
+                const res = await authFetch(`${API_URL}/documents/${currentDocId}/signers`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email: document.getElementById('signer-email').value, name: document.getElementById('signer-name').value })
+                });
+                if (!res.ok) throw new Error('Add signer failed');
+                document.getElementById('signer-email').value = ''; document.getElementById('signer-name').value = '';
+                loadDetail(currentDocId); notify('Signer added');
+            } catch (err) { notify(err.message); }
+        }
+
+        async function handleSend() {
+            try {
+                const res = await authFetch(`${API_URL}/documents/${currentDocId}/send`, {
+                    method: 'POST'
+                });
+                if (!res.ok) throw new Error('Send failed');
+                const data = await res.json();
+                notify('Document sent!');
+                const container = document.getElementById('signing-links-container');
+                const list = document.getElementById('signing-links-list');
+                list.innerHTML = '';
+                data.links.forEach(l => {
+                    const item = document.createElement('div'); item.style.marginBottom = '0.5rem';
+                    item.innerHTML = `<span style="color:#22c55e">${l.email}</span>: <a href="${l.link}" target="_blank" style="color:var(--accent)">${l.link}</a>`;
+                    list.appendChild(item);
+                });
+                container.classList.remove('hidden');
+            } catch (err) { notify(err.message); }
+        }
+
+        // --- VISUAL PLACEMENT ---
+        async function openVisualPlacement() {
+            if (!document.getElementById('field-signer-select').value) return notify('Please select a signer first');
+            showView('view-visual-placement');
+            try {
+                const url = `${API_URL}/documents/${currentDocId}/download`;
+                const loadingTask = pdfjsLib.getDocument({ url, httpHeaders: { 'Authorization': `Bearer ${token}` } });
+                pdfDoc = await loadingTask.promise;
+                renderPlacementPage(1);
+            } catch (err) { notify('Failed to load PDF: ' + err.message); showView('view-detail'); }
+        }
+
+        async function renderPlacementPage(num) {
+            const page = await pdfDoc.getPage(num);
+            const canvas = document.getElementById('placement-canvas');
+            const ctx = canvas.getContext('2d');
+            const viewport = page.getViewport({ scale: 1.5 });
+            canvas.height = viewport.height; canvas.width = viewport.width;
+            placementScale = viewport.scale;
+            await page.render({ canvasContext: ctx, viewport }).promise;
+            const box = document.getElementById('drag-signature-box');
+            box.classList.remove('hidden'); box.style.left = '50px'; box.style.top = '50px';
+            signatureBoxPos = { x: 50, y: 50 };
+        }
+
+        const dragBox = document.getElementById('drag-signature-box');
+        let isDragging = false, dragOffset = { x: 0, y: 0 };
+        dragBox.onmousedown = (e) => { isDragging = true; dragOffset.x = e.clientX - dragBox.offsetLeft; dragOffset.y = e.clientY - dragBox.offsetTop; };
+        window.onmousemove = (e) => {
+            if (!isDragging) return;
+            const container = document.getElementById('pdf-render-container');
+            const rect = container.getBoundingClientRect();
+            let x = e.clientX - dragOffset.x, y = e.clientY - dragOffset.y;
+            x = Math.max(0, Math.min(x, rect.width - dragBox.offsetWidth));
+            y = Math.max(0, Math.min(y, rect.height - dragBox.offsetHeight));
+            dragBox.style.left = x + 'px'; dragBox.style.top = y + 'px';
+            signatureBoxPos = { x, y };
+        };
+        window.onmouseup = () => isDragging = false;
+
+        async function confirmVisualField() {
+            const page = await pdfDoc.getPage(currentPageNum);
+            const viewport = page.getViewport({ scale: 1.0 });
+            const pdfWidth = viewport.width, pdfHeight = viewport.height;
+            const canvas = document.getElementById('placement-canvas');
+            const uiWidth = canvas.width, uiHeight = canvas.height;
+            const pdfX = (signatureBoxPos.x / uiWidth) * pdfWidth;
+            const pdfY = ((uiHeight - (signatureBoxPos.y + dragBox.offsetHeight)) / uiHeight) * pdfHeight;
+            try {
+                const res = await authFetch(`${API_URL}/documents/${currentDocId}/fields`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        signer_email: document.getElementById('field-signer-select').value,
+                        page_number: currentPageNum, x_coordinate: Math.round(pdfX), y_coordinate: Math.round(pdfY),
+                        type: "SIGNATURE",
+                        include_name: document.getElementById('field-include-name').checked,
+                        include_date: document.getElementById('field-include-date').checked
+                    })
+                });
+                if (!res.ok) throw new Error('Save failed');
+                notify('Field placed!'); showView('view-detail');
+            } catch (err) { notify(err.message); }
+        }
+
+        // --- SIGNING ---
+        function initCanvas() {
+            canvas = document.getElementById('sig-canvas'); ctx = canvas.getContext('2d');
+            ctx.strokeStyle = "#000"; ctx.lineWidth = 2;
+            const start = (e) => { drawing = true; const p = getPos(e); ctx.beginPath(); ctx.moveTo(p.x, p.y); };
+            const move = (e) => { if (drawing) { const p = getPos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); } };
+            const stop = () => drawing = false;
+            canvas.onmousedown = start; canvas.onmousemove = move; canvas.onmouseup = stop; canvas.onmouseout = stop;
+            canvas.ontouchstart = (e) => { e.preventDefault(); start(e.touches[0]); };
+            canvas.ontouchmove = (e) => { e.preventDefault(); move(e.touches[0]); };
+            canvas.ontouchend = stop;
+        }
+
+        function getPos(e) {
+            const rect = canvas.getBoundingClientRect();
+            return { x: (e.clientX || e.pageX) - rect.left, y: (e.clientY || e.pageY) - rect.top };
+        }
+        function clearSignature() { ctx.clearRect(0, 0, canvas.width, canvas.height); }
+
+        async function loadSigningPage() {
+            signingToken = new URLSearchParams(window.location.search).get('signing_token');
+            if (!signingToken) return;
+            showView('view-signing');
+            try {
+                const res = await fetch(`${API_URL}/signing/sign/${signingToken}`);
+                const data = await res.json();
+                document.getElementById('signing-doc-name').textContent = data.filename;
+                document.getElementById('signing-signer-name').textContent = data.signer_name;
+            } catch (err) { document.getElementById('view-signing').innerHTML = '<h2 style="color:red">Invalid link</h2>'; }
+        }
+
+        async function submitSignature() {
+            try {
+                const res = await fetch(`${API_URL}/signing/sign/${signingToken}`, {
+                    method: 'POST', headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ signature_data: canvas.toDataURL("image/png") })
+                });
+                if (!res.ok) throw new Error('Signing failed');
+                document.getElementById('view-signing').innerHTML = `
+                    <div class="card" style="text-align:center;">
+                        <h2 style="color:var(--success)">Signed!</h2>
+                        <p>The document is now being processed.</p>
+                        <button onclick="window.open('${API_URL}/signing/download/${signingToken}')" style="margin-top: 1rem; background: var(--success);">Download Document</button>
+                    </div>`;
+            } catch (err) { notify(err.message); }
+        }
+
+        if (new URLSearchParams(window.location.search).get('signing_token')) loadSigningPage();
+        else if (token) loadDashboard();
+        else showView('view-auth');
+    </script>
+</body>
+
+</html>
