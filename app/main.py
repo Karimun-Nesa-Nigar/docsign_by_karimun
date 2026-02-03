@@ -14,15 +14,13 @@ from contextlib import asynccontextmanager
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-
-  """Create database tables on startup"""
+    """Create database tables on startup"""
     try:
         logger.info("Creating database tables...")
         Base.metadata.create_all(bind=engine)
         logger.info("Database tables created successfully!")
     except Exception as e:
         logger.error(f"Error creating database tables: {e}")
-
     yield
 
 app = FastAPI(title="Docsign by Karimun", lifespan=lifespan)
