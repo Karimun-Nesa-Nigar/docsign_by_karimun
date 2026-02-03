@@ -3,12 +3,14 @@ from typing import Optional
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 
+
 import os
 
 # SECRET_KEY should be in environment variable
 SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey")
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440 # 24 hours
+
 
 pwd_context = CryptContext(schemes=["argon2"], deprecated="auto")
 

@@ -11,6 +11,7 @@ if DATABASE_URL:
     # Vercel provides postgres:// but SQLAlchemy needs postgresql://
     if DATABASE_URL.startswith("postgres://"):
         DATABASE_URL = DATABASE_URL.replace("postgres://", "postgresql://", 1)
+
     
     # Add SSL mode for production (Vercel Postgres requirement)
     if "sslmode" not in DATABASE_URL:
@@ -19,6 +20,7 @@ if DATABASE_URL:
         else:
             DATABASE_URL += "?sslmode=require"
             
+
     engine = create_engine(DATABASE_URL)
 else:
     # Local development: Use SQLite

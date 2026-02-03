@@ -388,10 +388,13 @@
                     method: 'POST', headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email: document.getElementById('reg-email').value, password: document.getElementById('reg-password').value })
                 });
+
                 if (!res.ok) {
                     const errorData = await res.json();
                     throw new Error(errorData.detail || 'Registration failed');
                 }
+
+
                 notify('Registered! Please login.');
                 toggleAuth('login');
             } catch (err) { notify(err.message); }
