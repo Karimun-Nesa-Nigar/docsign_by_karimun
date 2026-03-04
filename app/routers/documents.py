@@ -60,10 +60,11 @@ async def download_document(
     if document.status == models.DocumentStatus.COMPLETED:
         # Try to get signed version
         signed_filename = f"signed_{document.id}.pdf"
-        if storage.IS_VERCEL:
-            # In Vercel, check if signed file exists in DB or construct blob URL
+        if storage.IS_PRODUCTION:
+            # In Production (Supabase), check if signed file exists
             # For now, we'll store signed_path in a separate field or use naming convention
-            signed_path = document.file_path.replace(document.filename, signed_filename) if "/" in document.file_path else f"signed_docs/{signed_filename}"
+            # Supabase buckets are separate, so 'signed_docs' is the bucket
+            signed_path = f"signed_docs/{signed_filename}"
         else:
             signed_path = os.path.join("signed_docs", signed_filename)
             if os.path.exists(signed_path):

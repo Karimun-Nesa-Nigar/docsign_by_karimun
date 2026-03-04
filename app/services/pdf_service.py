@@ -156,7 +156,8 @@ def sign_pdf_bytes(input_pdf_bytes: bytes, signatures: list) -> bytes:
             packet.seek(0)
             
             watermark = PdfReader(packet)
-            page.merge_page(watermark.pages[0])
+            if len(watermark.pages) > 0:
+                page.merge_page(watermark.pages[0])
         
         writer.add_page(page)
 

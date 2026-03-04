@@ -89,11 +89,17 @@ def run_test():
     
     # Extract signing link/token
     link = json_resp["links"][0]["link"]
-    token = link.split("/")[-1]
+    # link format: http://localhost:8000/?signing_token=UUID
+    if "signing_token=" in link:
+        token = link.split("signing_token=")[-1]
+    else:
+        token = link.split("/")[-1]
     
     # Mock Signing
     print(f"\n7. Signing document as {signer_email} with token {token}...")
-    resp = requests.post(f"{BASE_URL}/signing/sign/{token}?signature_text=JohnDoeParsed", json={})
+    # Create a dummy base64 image
+    dummy_signature = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg=="
+    resp = requests.post(f"{BASE_URL}/signing/sign/{token}", json={"signature_data": dummy_signature})
     if resp.status_code != 200:
         print(f"Error signing: {resp.text}")
         return

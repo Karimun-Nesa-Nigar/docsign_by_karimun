@@ -24,8 +24,8 @@ async def download_signed_by_token(token: str, db: Session = Depends(get_db)):
     if document.status == models.DocumentStatus.COMPLETED:
         # Try to get signed version
         signed_filename = f"signed_{document.id}.pdf"
-        if storage.IS_VERCEL:
-            signed_path = document.file_path.replace(os.path.basename(document.file_path), signed_filename) if "/" in document.file_path else f"signed_docs/{signed_filename}"
+        if storage.IS_PRODUCTION:
+            signed_path = f"signed_docs/{signed_filename}"
         else:
             signed_path = os.path.join("signed_docs", signed_filename)
             if os.path.exists(signed_path):
@@ -118,7 +118,7 @@ async def sign_document(token: str, submission: SignatureSubmission, request: Re
             for s in document.signers:
                 # Load saved signature using storage layer
                 s_sig_filename = f"sig_{s.id}_{s.token}.png.txt"
-                if storage.IS_VERCEL:
+                if storage.IS_PRODUCTION:
                     s_sig_path = f"signed_docs/{s_sig_filename}"
                 else:
                     s_sig_path = os.path.join("signed_docs", s_sig_filename)

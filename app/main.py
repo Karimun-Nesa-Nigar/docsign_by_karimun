@@ -45,5 +45,5 @@ def health_check():
     return {
         "status": "ok",
         "database": "postgres" if os.getenv("DATABASE_URL") else "sqlite",
-        "storage": "vercel_blob" if os.getenv("BLOB_READ_WRITE_TOKEN") else "local"
+        "storage": "supabase" if os.getenv("SUPABASE_URL") else "local"
     }
